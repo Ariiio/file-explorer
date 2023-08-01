@@ -2,7 +2,7 @@
 
 use eframe::{
     egui::{self, Ui, Vec2},
-    run_native, App, NativeOptions,
+    run_native, App, IconData, NativeOptions,
 };
 use std::{
     fs,
@@ -36,14 +36,23 @@ impl SFE {
         } else {
             let content = fs::read_dir(&self.current_path).unwrap();
             for path in content {
+                let md = fs::metadata(path.as_ref().unwrap().path()).unwrap();
+                // render icon according to md, always render button | make row or horizontal
+
                 let mut path_as_string = path.as_ref().unwrap().path().display().to_string();
                 if ui
                     .button(&path_as_string.replace(&self.current_path.display().to_string(), ""))
                     .double_clicked()
                 {
-                    path_as_string.push_str("\\");
-                    self.current_path.push(&path_as_string);
-                    self.last_path.push(path_as_string);
+                    if md.is_dir() {
+                        path_as_string.push_str("\\");
+                        self.current_path.push(&path_as_string);
+                        self.last_path.push(path_as_string);
+                    }
+
+                    if md.is_file() {
+                        println!("this is a file");
+                    }
                 }
             }
         }
@@ -88,14 +97,21 @@ impl App for SFE {
 }
 
 fn main() {
+    // let icon = image::open("123.jpg").expect("Failed to open icon path").to_rgba8();
+    // let (icon_width, icon_height) = icon.dimensions();
+
     let app = SFE::new();
     let mut win_option = NativeOptions::default();
 
     win_option.initial_window_size = Some(Vec2::new(960.0, 540.0));
-    // win_option.icon_data = Some();
+    // win_option.icon_data = Some(IconData {
+    //     rgba: icon.into_raw(),
+    //     width: icon_width,
+    //     height: icon_height,
+    // });
 
     let _ = run_native(
-        "Simple Flie Explorer",
+        "Dario’s spritziger Dateinsucher",
         win_option,
         Box::new(|_cc| Box::new(app)),
     );
