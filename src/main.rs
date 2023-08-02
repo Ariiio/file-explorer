@@ -2,6 +2,7 @@
 
 use eframe::{
     egui::{self, Ui, Vec2},
+    epaint::ColorImage,
     run_native, App, IconData, NativeOptions,
 };
 use std::{
@@ -13,18 +14,47 @@ use winsafe;
 struct SFE {
     current_path: PathBuf,
     last_path: PathBuf,
+    folder_image: ColorImage,
+    file_image: ColorImage,
 }
 
 impl SFE {
     fn new() -> Self {
+        let folder_buffer = image::open(
+            "C:\\Users\\Ario\\Desktop\\Dario Zeug\\rust\\file-explorer\\assets\\folder.png",
+        )
+        .expect("Couldnt load image")
+        .resize(20, 24, image::imageops::FilterType::CatmullRom)
+        .into_rgba8();
+        let folder_image = egui::ColorImage::from_rgba_unmultiplied(
+            [
+                folder_buffer.width().try_into().unwrap(),
+                folder_buffer.height().try_into().unwrap(),
+            ],
+            &folder_buffer,
+        );
+
+        let file_buffer = image::open(
+            "C:\\Users\\Ario\\Desktop\\Dario Zeug\\rust\\file-explorer\\assets\\file.png",
+        )
+        .expect("Couldnt load image")
+        .resize(15, 19, image::imageops::FilterType::CatmullRom)
+        .into_rgba8();
+        let file_image = egui::ColorImage::from_rgba_unmultiplied(
+            [
+                file_buffer.width().try_into().unwrap(),
+                file_buffer.height().try_into().unwrap(),
+            ],
+            &file_buffer,
+        );
         Self {
             current_path: PathBuf::from("Drives"),
             last_path: PathBuf::new(),
+            folder_image: folder_image,
+            file_image: file_image,
         }
     }
 
-    // implement check for files and dirs
-    // --> implement images according to type
     fn change_display(&mut self, ui: &mut Ui, ctx: &egui::Context) {
         if self.current_path.display().to_string() == "Drives" {
             for item in winsafe::GetLogicalDriveStrings().unwrap() {
@@ -34,26 +64,41 @@ impl SFE {
                 }
             }
         } else {
+            let folder_handle =
+                ctx.load_texture("folder", self.folder_image.clone(), Default::default());
+            let file_handle = ctx.load_texture("file", self.file_image.clone(), Default::default());
+
             let content = fs::read_dir(&self.current_path).unwrap();
             for path in content {
                 let md = fs::metadata(path.as_ref().unwrap().path()).unwrap();
-                // render icon according to md, always render button | make row or horizontal
-
                 let mut path_as_string = path.as_ref().unwrap().path().display().to_string();
-                if ui
-                    .button(&path_as_string.replace(&self.current_path.display().to_string(), ""))
-                    .double_clicked()
-                {
-                    if md.is_dir() {
-                        path_as_string.push_str("\\");
-                        self.current_path.push(&path_as_string);
-                        self.last_path.push(path_as_string);
-                    }
+                ui.horizontal(|ui| {
+                    // use extension for different icons????
+                    // let path_as_raw_path = path.unwrap().path();
+                    // let ext = path_as_raw_path.extension();
 
-                    if md.is_file() {
-                        println!("this is a file");
+                    if md.is_dir() {
+                        ui.image(&folder_handle, folder_handle.size_vec2());
+                    } else if md.is_file() {
+                        ui.image(&file_handle, file_handle.size_vec2());
                     }
-                }
+                    if ui
+                        .button(
+                            &path_as_string.replace(&self.current_path.display().to_string(), ""),
+                        )
+                        .double_clicked()
+                    {
+                        if md.is_dir() {
+                            path_as_string.push_str("\\");
+                            self.current_path.push(&path_as_string);
+                            self.last_path.push(&path_as_string);
+                        }
+
+                        if md.is_file() {
+                            open::commands(&path_as_string)[0].status();
+                        }
+                    }
+                });
             }
         }
     }
@@ -61,6 +106,7 @@ impl SFE {
     fn render_header(&mut self, ui: &mut Ui) {
         egui::Grid::new("id_source").show(ui, |ui| {
             if ui.button("back").clicked() {
+                // fix back by pushiing / to the end of current_path
                 let mut parent = self.current_path.parent();
                 if parent == None || parent == Some(Path::new("")) {
                     parent = Some(Path::new("Drives"));
